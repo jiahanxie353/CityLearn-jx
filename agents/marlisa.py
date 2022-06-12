@@ -1,5 +1,5 @@
-from common.preprocessing import *
-from common.rl import *
+from CityLearn.common.preprocessing import *
+from CityLearn.common.rl import *
 from sklearn.linear_model import LinearRegression
 from sklearn.decomposition import PCA
 from sklearn.ensemble import GradientBoostingRegressor

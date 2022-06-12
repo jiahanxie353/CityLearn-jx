@@ -1,5 +1,5 @@
-from common.preprocessing import *
-from common.rl import *
+from CityLearn.common.preprocessing import *
+from CityLearn.common.rl import *
 import torch.optim as optim
 from torch.optim import Adam
 import json
