@@ -24,7 +24,7 @@ class DDPG:
                  lr_critic=1e-3,
                  batch_size=256,
                  replay_buffer_capacity=5e5,
-                 start_training=3000,
+                 start_training=100,
                  exploration_period=8000,
                  action_scaling_coef=0.5,
                  reward_scaling=5.,
@@ -147,10 +147,10 @@ class DDPG:
                 state_ = (state_ - self.norm_mean[uid]) / self.norm_std[uid]
                 state_ = torch.FloatTensor(state_).unsqueeze(0).to(self.device)
 
-                self.actor_net.eval()
+                self.actor_net[uid].eval()
                 with torch.no_grad():
                     act = self.actor_net(state_).cpu().data.numpy()
-                self.actor_net.train()
+                self.actor_net[uid].train()
                 act += noise_scale * np.random.randn(self.action_dim)
                 act = np.clip(act, -self.action_limit[uid], self.action_limit[uid])
                 actions.append(act.detach().cpu().numpy()[0])
@@ -175,6 +175,7 @@ class DDPG:
             self.replay_buffer[uid].push(o, a, r, o2, done)
 
         if self.time_step >= self.start_training and self.batch_size <= len(self.replay_buffer[self.building_ids[0]]):
+            print("start training")
             for uid in self.building_ids:
                 if self.norm_flag[uid] == 0:
                     X = np.array([j[0] for j in self.replay_buffer[uid].buffer])

@@ -1,5 +1,3 @@
-from abc import ABC
-
 import gym
 from gym.utils import seeding
 import numpy as np
@@ -190,16 +188,13 @@ def building_loader(data_path, building_attributes, weather_file, solar_profile,
 
             building.sim_results['carbon_intensity'] = list(data['kg_CO2/kWh'])
 
-            # Finding the max and min possible values of all the states, which can then be used by the RL agent to
-            # scale the states and train any function approximators more effectively
+            # Finding the max and min possible values of all the states, which can then be used by the RL agent to scale the states and train any function approximators more effectively
             s_low, s_high = [], []
             for state_name, value in zip(buildings_states_actions[uid]['states'],
                                          buildings_states_actions[uid]['states'].values()):
-                if value:
+                if value == True:
                     if state_name == "net_electricity_consumption":
-                        # lower and upper bounds of net electricity consumption are rough estimates and may not be
-                        # completely accurate. Scaling this state-variable using these bounds may result in
-                        # normalized values above 1 or below 0.
+                        # lower and upper bounds of net electricity consumption are rough estimates and may not be completely accurate. Scaling this state-variable using these bounds may result in normalized values above 1 or below 0.
                         _net_elec_cons_upper_bound = max(
                             np.array(building.sim_results['non_shiftable_load']) - np.array(
                                 building.sim_results['solar_gen']) + np.array(
@@ -215,10 +210,7 @@ def building_loader(data_path, building_attributes, weather_file, solar_profile,
                         s_low.append(min(building.sim_results[state_name]))
                         s_high.append(max(building.sim_results[state_name]))
 
-                        # Create boundaries of the observation space of a centralized agent (if a central agent is
-                        # being used instead of decentralized ones). We include all the weather variables used as
-                        # states, and use the list appended_states to make sure we don't include any repeated states
-                        # (i.e. weather variables measured by different buildings)
+                        # Create boundaries of the observation space of a centralized agent (if a central agent is being used instead of decentralized ones). We include all the weather variables used as states, and use the list appended_states to make sure we don't include any repeated states (i.e. weather variables measured by different buildings)
                         if state_name in ['t_in', 'avg_unmet_setpoint', 'rh_in', 'non_shiftable_load', 'solar_gen']:
                             s_low_central_agent.append(min(building.sim_results[state_name]))
                             s_high_central_agent.append(max(building.sim_results[state_name]))
@@ -233,19 +225,11 @@ def building_loader(data_path, building_attributes, weather_file, solar_profile,
                         s_low_central_agent.append(0.0)
                         s_high_central_agent.append(1.0)
 
-            '''The energy storage (tank) capacity indicates how many times bigger the tank is compared to the maximum 
-            hourly energy demand of the building (cooling or DHW respectively), which sets a lower bound for the 
-            action of 1/tank_capacity, as the energy storage device can't provide the building with more energy than 
-            it will ever need for a given hour. The heat pump is sized using approximately the maximum hourly energy 
-            demand of the building (after accounting for the COP, see function autosize). Therefore, we make the fair 
-            assumption that the action also has an upper bound equal to 1/tank_capacity. This boundaries should speed 
-            up the learning process of the agents and make them more stable rather than if we just set them to -1 and 
-            1. I.e. if Chilled_Water_Tank.Capacity is 3 (3 times the max. hourly demand of the building in the entire 
-            year), its actions will be bounded between -1/3 and 1/3 '''
+            '''The energy storage (tank) capacity indicates how many times bigger the tank is compared to the maximum hourly energy demand of the building (cooling or DHW respectively), which sets a lower bound for the action of 1/tank_capacity, as the energy storage device can't provide the building with more energy than it will ever need for a given hour. The heat pump is sized using approximately the maximum hourly energy demand of the building (after accounting for the COP, see function autosize). Therefore, we make the fair assumption that the action also has an upper bound equal to 1/tank_capacity. This boundaries should speed up the learning process of the agents and make them more stable rather than if we just set them to -1 and 1. I.e. if Chilled_Water_Tank.Capacity is 3 (3 times the max. hourly demand of the building in the entire year), its actions will be bounded between -1/3 and 1/3'''
             a_low, a_high = [], []
             for action_name, value in zip(buildings_states_actions[uid]['actions'],
                                           buildings_states_actions[uid]['actions'].values()):
-                if value:
+                if value == True:
                     if action_name == 'cooling_storage':
 
                         # Avoid division by 0
@@ -317,7 +301,7 @@ def building_loader(data_path, building_attributes, weather_file, solar_profile,
     return buildings, observation_spaces, action_spaces, observation_space_central_agent, action_space_central_agent
 
 
-class CityLearn(gym.Env, ABC):
+class CityLearn(gym.Env):
     def __init__(self, data_path, building_attributes, weather_file, solar_profile, building_ids, carbon_intensity=None,
                  buildings_states_actions=None, simulation_period=(0, 8759),
                  cost_function=['ramping', '1-load_factor', 'average_daily_peak', 'peak_demand',
@@ -348,8 +332,7 @@ class CityLearn(gym.Env, ABC):
                          'buildings_states_actions': self.buildings_states_actions,
                          'save_memory': save_memory}
 
-        self.buildings, self.observation_spaces, self.action_spaces, self.observation_space, self.action_space = \
-            building_loader(
+        self.buildings, self.observation_spaces, self.action_spaces, self.observation_space, self.action_space = building_loader(
             **params_loader)
 
         self.simulation_period = simulation_period
@@ -414,10 +397,7 @@ class CityLearn(gym.Env, ABC):
         elec_generation = 0
 
         if self.central_agent:
-            # If the agent is centralized, all the actions for all the buildings are provided as an ordered list of
-            # numbers. The order corresponds to the order of the buildings as they appear on the file
-            # building_attributes.json, and only considering the buildings selected for the simulation by the user (
-            # building_ids).
+            # If the agent is centralized, all the actions for all the buildings are provided as an ordered list of numbers. The order corresponds to the order of the buildings as they appear on the file building_attributes.json, and only considering the buildings selected for the simulation by the user (building_ids).
             for uid, building in self.buildings.items():
 
                 if self.buildings_states_actions[uid]['actions']['cooling_storage']:
@@ -473,8 +453,7 @@ class CityLearn(gym.Env, ABC):
                     a), "The number of input actions for building " + str(
                     uid) + " must match the number of actions defined in the list of building attributes."
 
-                # Getting input actions and stablishing associations between the components of the action array and
-                # their corresponding actions.
+                # Getting input actions and stablishing associations between the components of the action array and their corresponding actions.
                 if self.buildings_states_actions[uid]['actions']['electrical_storage']:
 
                     if self.buildings_states_actions[uid]['actions']['cooling_storage']:
@@ -570,9 +549,7 @@ class CityLearn(gym.Env, ABC):
             s, s_appended = [], []
             for uid, building in self.buildings.items():
 
-                # If the agent is centralized, we append the states avoiding repetition. I.e. if multiple buildings
-                # share the outdoor temperature as a state, we only append it once to the states of the central
-                # agent. The variable s_appended is used for this purpose.
+                # If the agent is centralized, we append the states avoiding repetition. I.e. if multiple buildings share the outdoor temperature as a state, we only append it once to the states of the central agent. The variable s_appended is used for this purpose.
                 for state_name, value in self.buildings_states_actions[uid]['states'].items():
                     if value == True:
                         if state_name not in s_appended:
@@ -617,8 +594,7 @@ class CityLearn(gym.Env, ABC):
                                                        self.current_carbon_intensity)
             self.cumulated_reward_episode += sum(rewards)
 
-        # Control variables which are used to display the results and the behavior of the buildings at the district
-        # level.
+        # Control variables which are used to display the results and the behavior of the buildings at the district level.
         self.carbon_emissions.append(np.float32(max(0, electric_demand) * self.current_carbon_intensity))
         self.net_electric_consumption.append(np.float32(electric_demand))
         self.electric_consumption_electric_storage.append(np.float32(elec_consumption_electrical_storage))
@@ -784,8 +760,7 @@ class CityLearn(gym.Env, ABC):
                     1:]).sum() / self.cost_rbc_last_yr['ramping_last_yr']
                 c_score_last_yr.append(cost_last_yr['ramping_last_yr'])
 
-        # Finds the load factor for every month (average monthly demand divided by its maximum peak), and averages
-        # all the load factors across the 12 months. The metric is one minus the load factor.
+        # Finds the load factor for every month (average monthly demand divided by its maximum peak), and averages all the load factors across the 12 months. The metric is one minus the load factor.
         if '1-load_factor' in self.cost_function:
             cost['1-load_factor'] = np.mean([1 - np.mean(self.net_electric_consumption[i:i + int(8760 / 12)]) / np.max(
                 self.net_electric_consumption[i:i + int(8760 / 12)]) for i in
@@ -804,6 +779,7 @@ class CityLearn(gym.Env, ABC):
 
         # Average of all the daily peaks of the 365 day of the year. The peaks are calculated using the net energy demand of the whole district of buildings.
         if 'average_daily_peak' in self.cost_function:
+            self.net_electric_consumption = np.array(self.net_electric_consumption)
             cost['average_daily_peak'] = np.mean([self.net_electric_consumption[i:i + 24].max() for i in
                                                   range(0, len(self.net_electric_consumption), 24)]) / self.cost_rbc[
                                              'average_daily_peak']
@@ -826,9 +802,7 @@ class CityLearn(gym.Env, ABC):
                                                       self.cost_rbc_last_yr['peak_demand_last_yr']
                 c_score_last_yr.append(cost_last_yr['peak_demand_last_yr'])
 
-        # Positive net electricity consumption for the whole district. It is clipped at a min. value of 0 because the
-        # objective is to minimize the energy consumed in the district, not to profit from the excess generation. (
-        # Island operation is therefore incentivized)
+        # Positive net electricity consumption for the whole district. It is clipped at a min. value of 0 because the objective is to minimize the energy consumed in the district, not to profit from the excess generation. (Island operation is therefore incentivized)
         if 'net_electricity_consumption' in self.cost_function:
             cost['net_electricity_consumption'] = self.net_electric_consumption.clip(min=0).sum() / self.cost_rbc[
                 'net_electricity_consumption']
@@ -838,6 +812,7 @@ class CityLearn(gym.Env, ABC):
                     min=0).sum() / self.cost_rbc_last_yr['net_electricity_consumption_last_yr']
 
         if 'carbon_emissions' in self.cost_function:
+            self.carbon_emissions = np.array(self.carbon_emissions)
             cost['carbon_emissions'] = self.carbon_emissions.sum() / self.cost_rbc['carbon_emissions']
 
             if self.simulation_period[1] - self.simulation_period[0] > 8760:
@@ -846,6 +821,7 @@ class CityLearn(gym.Env, ABC):
 
         # Not used for the challenge
         if 'quadratic' in self.cost_function:
+            self.net_electric_consumption = np.array(self.net_electric_consumption)
             cost['quadratic'] = (self.net_electric_consumption.clip(min=0) ** 2).sum() / self.cost_rbc['quadratic']
             c_score.append(cost['quadratic'])
 
@@ -856,10 +832,10 @@ class CityLearn(gym.Env, ABC):
 
         cost['total'] = np.mean([c for c in cost.values()])
 
-        if c_score:
+        if c_score != []:
             cost['coordination_score'] = np.mean(c_score)
 
-        if c_score_last_yr:
+        if c_score_last_yr != []:
             cost_last_yr['coordination_score_last_yr'] = np.mean(c_score_last_yr)
 
         if self.simulation_period[1] - self.simulation_period[0] > 8760:

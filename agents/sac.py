@@ -70,7 +70,7 @@ class SAC:
                     self.encoder[uid].append(periodic_normalization(self.observation_spaces[uid].high[state_n]))
                     state_n += 1
                 elif s_name == "day":
-                    self.encoder[uid].append(onehot_encoding([1, 2, 3, 4, 5, 6, 7]))
+                    self.encoder[uid].append(onehot_encoding([1, 2, 3, 4, 5, 6, 7,8]))
                     state_n += 1
                 elif s_name == "daylight_savings_status":
                     self.encoder[uid].append(onehot_encoding([0, 1]))

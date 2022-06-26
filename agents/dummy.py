@@ -36,8 +36,6 @@ params_agent = {'building_ids':building_ids,
                  'observation_spaces':observations_spaces,
                  'action_spaces':actions_spaces}
 
-state = env.reset()
-
 if __name__ == '__main__':
     import argparse
 
@@ -50,5 +48,19 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--exp_name', type=str, default='ddpg')
     args = parser.parse_args()
+
     agents = Agent(**params_agent)
-    print(agents.action_spaces)
+
+    state = env.reset()
+    done = False
+
+    action, coordination_vars = agents.select_action(state)
+    for i in range(1,2):
+        next_state, reward, done, _ = env.step(action)
+        action_next, coordination_vars_next = agents.select_action(next_state)
+        agents.add_to_buffer(state, action, reward, next_state, done, coordination_vars, coordination_vars_next)
+        coordination_vars = coordination_vars_next
+        state = next_state
+        action = action_next
+
+    env.cost()
