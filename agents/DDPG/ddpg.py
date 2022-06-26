@@ -24,7 +24,7 @@ class DDPG:
                  lr_critic=1e-3,
                  batch_size=256,
                  replay_buffer_capacity=5e5,
-                 start_training=100,
+                 start_training=3000,
                  exploration_period=8000,
                  action_scaling_coef=0.5,
                  reward_scaling=5.,
