@@ -37,17 +37,6 @@ params_agent = {'building_ids':building_ids,
                  'action_spaces':actions_spaces}
 
 if __name__ == '__main__':
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='HalfCheetah-v2')
-    parser.add_argument('--hid', type=int, default=256)
-    parser.add_argument('--l', type=int, default=2)
-    parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--epochs', type=int, default=50)
-    parser.add_argument('--exp_name', type=str, default='ddpg')
-    args = parser.parse_args()
 
     agents = Agent(**params_agent)
 
@@ -55,7 +44,7 @@ if __name__ == '__main__':
     done = False
 
     action, coordination_vars = agents.select_action(state)
-    for i in range(1,2):
+    for i in range(1,30):
         next_state, reward, done, _ = env.step(action)
         action_next, coordination_vars_next = agents.select_action(next_state)
         agents.add_to_buffer(state, action, reward, next_state, done, coordination_vars, coordination_vars_next)
@@ -63,4 +52,4 @@ if __name__ == '__main__':
         state = next_state
         action = action_next
 
-    env.cost()
+    print(env.cost())

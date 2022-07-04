@@ -25,10 +25,10 @@ class DDPG:
                  batch_size=256,
                  replay_buffer_capacity=5e5,
                  start_training=3000,
-                 exploration_period=8000,
+                 exploration_period=8760,
                  action_scaling_coef=0.5,
                  reward_scaling=5.,
-                 update_per_step=10,
+                 update_per_step=20,
                  act_noise=0.2,
                  seed=0):
 
@@ -48,7 +48,7 @@ class DDPG:
         self.update_per_step = update_per_step
         self.exploration_period = exploration_period
 
-        self.action_list_ = []
+        self.action_dim = {}
 
         self.time_step = 0
         self.norm_flag = {uid: 0 for uid in building_ids}
@@ -62,7 +62,9 @@ class DDPG:
 
         self.critic_loss_, self.actor_loss_ = {}, {}
 
-        self.replay_buffer, self.critic_net, self.target_critic_net, self.actor_net, self.target_actor_net, self.critic_optimizer, self.actor_optimizer, self.encoder, self.norm_mean, self.norm_std, self.r_norm_mean, self.r_norm_std, self.norm_mean, self.norm_std, self.r_norm_mean, self.r_norm_std = {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
+        self.replay_buffer, self.critic_net, self.target_critic_net, self.actor_net, self.target_actor_net, \
+        self.critic_optimizer, self.actor_optimizer, self.encoder, self.norm_mean, self.norm_std, self.r_norm_mean, \
+        self.r_norm_std = {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
 
         for uid in building_ids:
             self.critic_loss_[uid], self.actor_loss_[uid] = [], []
@@ -111,21 +113,21 @@ class DDPG:
                 [j for j in np.hstack(self.encoder[uid] * np.ones(len(self.observation_spaces[uid].low))) if
                  j is not None])
 
-            action_dim = self.action_spaces[uid].shape[0]
+            self.action_dim[uid] = self.action_spaces[uid].shape[0]
             self.action_limit[uid] = self.action_spaces[uid].high[0]
 
             self.replay_buffer[uid] = ReplayBuffer(int(replay_buffer_capacity))
 
             # init critic networks
-            self.critic_net[uid] = core.Critic(state_dim, action_dim, hidden_dim).to(self.device)
-            self.target_critic_net[uid] = core.Critic(state_dim, action_dim, hidden_dim).to(self.device)
+            self.critic_net[uid] = core.Critic(state_dim, self.action_dim[uid], hidden_dim).to(self.device)
+            self.target_critic_net[uid] = core.Critic(state_dim, self.action_dim[uid], hidden_dim).to(self.device)
             for target_param, param in zip(self.target_critic_net[uid].parameters(),
                                            self.critic_net[uid].parameters()):
                 target_param.data.copy_(param.data)
 
             # actor network
-            self.actor_net[uid] = core.Actor(state_dim, action_dim, hidden_dim).to(self.device)
-            self.target_actor_net[uid] = core.Actor(state_dim, action_dim, hidden_dim).to(self.device)
+            self.actor_net[uid] = core.Actor(state_dim, self.action_dim[uid], hidden_dim).to(self.device)
+            self.target_actor_net[uid] = core.Actor(state_dim, self.action_dim[uid], hidden_dim).to(self.device)
 
             # optimizers
             self.critic_optimizer[uid] = optim.Adam(self.critic_net[uid].parameters(), lr=lr_critic)
@@ -142,18 +144,19 @@ class DDPG:
             if explore:
                 actions.append(self.action_scaling_coef * self.action_spaces[uid].sample())
             else:
-                state_ = np.array([j for j in np.hstack(self.encoder[uid] * state) if j is not None])
+                state = np.array([j for j in np.hstack(self.encoder[uid] * state) if j is not None])
 
-                state_ = (state_ - self.norm_mean[uid]) / self.norm_std[uid]
-                state_ = torch.FloatTensor(state_).unsqueeze(0).to(self.device)
+                state = (state - self.norm_mean[uid]) / self.norm_std[uid]
+                state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
 
                 self.actor_net[uid].eval()
                 with torch.no_grad():
-                    act = self.actor_net(state_).cpu().data.numpy()
+                    act = self.actor_net[uid](state).cpu().data.numpy()
                 self.actor_net[uid].train()
-                act += noise_scale * np.random.randn(self.action_dim)
+
+                act += noise_scale * np.random.randn(self.action_dim[uid])
                 act = np.clip(act, -self.action_limit[uid], self.action_limit[uid])
-                actions.append(act.detach().cpu().numpy()[0])
+                actions.append(act[0])
 
         return np.array(actions)
 
@@ -174,8 +177,10 @@ class DDPG:
 
             self.replay_buffer[uid].push(o, a, r, o2, done)
 
-        if self.time_step >= self.start_training and self.batch_size <= len(self.replay_buffer[self.building_ids[0]]):
-            print("start training")
+        if self.time_step >= self.start_training and self.batch_size <= len(self.replay_buffer[self.building_ids[0]]) \
+                and self.time_step % self.update_per_step == 0:
+            if self.time_step % 1000 == 0:
+                print(self.time_step)
             for uid in self.building_ids:
                 if self.norm_flag[uid] == 0:
                     X = np.array([j[0] for j in self.replay_buffer[uid].buffer])

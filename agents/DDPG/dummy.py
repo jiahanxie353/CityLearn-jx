@@ -44,7 +44,7 @@ if __name__ == '__main__':
     done = False
 
     action = agents.select_action(state,0.2)
-    for i in range(1,25):
+    for i in range(1,30):
         next_state, reward, done, _ = env.step(action)
         action_next = agents.select_action(next_state,0.2)
         agents.add_to_buffer(state, action, reward, next_state, done)
