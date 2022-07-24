@@ -99,29 +99,29 @@ class AttentionSAC(object):
 
         # target critic
         q_pi_targ, backup = [], []
-        with torch.no_grad():
-            next_acts, next_log_pis = zip(*[a.update_critic(sample) for a, sample in zip(self.agents, samples)])
-            trgt_critic_in = list(zip(next_obs, next_acts))  # next_acts come from agents' current policy net
 
-            q1_pi_targ = self.target_critic1(trgt_critic_in)
-            q2_pi_targ = self.target_critic2(trgt_critic_in)
-            for i in range(self.num_agents):
-                q_pi_targ.append(torch.min(q1_pi_targ[i], q2_pi_targ[i]))
-                backup.append(rews[i].view(-1, 1) + self.gamma * q_pi_targ[i] * (1 - dones[i].view(-1, 1)))
-                if len(next_log_pis[i].shape) == 1:
-                    backup[i] -= next_log_pis[i].unsqueeze(dim=-1) / self.reward_scale
-                else:
-                    backup[i] -= next_log_pis[i] / self.reward_scale
+        next_acts, next_log_pis = zip(*[a.update_critic(sample) for a, sample in zip(self.agents, samples)])
+        trgt_critic_in = list(zip(next_obs, next_acts))  # next_acts come from agents' current policy net
 
-        loss_q1, loss_q2, loss_q = [], [], []
+        q1_pi_targ = self.target_critic1(trgt_critic_in)
+        q2_pi_targ = self.target_critic2(trgt_critic_in)
         for i in range(self.num_agents):
-            loss_q1.append(((critic_rets1[i][0] - backup[i]) ** 2).mean())
-            loss_q1[i] += critic_rets1[i][1][0]
-            loss_q2.append(((critic_rets2[i][0] - backup[i]) ** 2).mean())
-            loss_q2[i] += critic_rets2[i][1][0]
-            loss_q.append(loss_q1[i] + loss_q2[i])
+            q_pi_targ.append(torch.min(q1_pi_targ[i], q2_pi_targ[i]))
+            backup.append(rews[i].view(-1, 1) + self.gamma * q_pi_targ[i] * (1 - dones[i].view(-1, 1)))
+            if len(next_log_pis[i].shape) == 1:
+                backup[i] -= next_log_pis[i].unsqueeze(dim=-1) / self.reward_scale
+            else:
+                backup[i] -= next_log_pis[i] / self.reward_scale
 
-        return torch.tensor(loss_q, requires_grad=True)
+        loss_q1, loss_q2, loss_q = 0, 0, 0
+        for i in range(self.num_agents):
+            loss_q1 += MSELoss(critic_rets1[i][0], backup[i].detach())
+            loss_q2 += MSELoss(critic_rets2[i][0], backup[i].detach())
+            loss_q1 += critic_rets1[i][1][0]
+            loss_q2 += critic_rets2[i][1][0]
+            loss_q += (loss_q1 + loss_q2)
+
+        return loss_q
 
     def update_critics(self, samples, soft=True):
         """
@@ -154,7 +154,7 @@ class AttentionSAC(object):
 
         # Q loss
         loss_q = self.compute_loss_q(samples)
-        loss_q = torch.sum(loss_q)
+        loss_q = torch.mean(loss_q)
 
         loss_q.backward()
         self.critic1.scale_shared_grads()
@@ -203,10 +203,12 @@ class AttentionSAC(object):
             samp_acts.append(curr_act)
             all_log_pis.append(log_pi)
 
+        critic_rets = []
         critic_in = list(zip(obs, samp_acts))
         critic_rets1 = self.critic1(critic_in)
         critic_rets2 = self.critic2(critic_in)
-        critic_rets = torch.min(critic_rets1, critic_rets2)
+        for i in range(self.num_agents):
+            critic_rets.append(torch.min(critic_rets1[i], critic_rets2[i]))
 
         for a_i, log_pi, q in zip(range(self.num_agents), all_log_pis, critic_rets):
             if len(log_pi.shape) == 1:
