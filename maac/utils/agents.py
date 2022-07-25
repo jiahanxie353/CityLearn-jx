@@ -92,7 +92,6 @@ class AttentionAgent(object):
             self.replay_buffer.buffer = new_buffer
             self.norm_flag = 1
 
-
     def add_to_buffer(self, encoder, state, act, reward, next_state, done):
         # Run once the regression model has been fitted. Normalize all the states using periodical normalization,
         # one-hot encoding, or -1, 1 scaling. It also removes states that are not necessary (solar radiation if

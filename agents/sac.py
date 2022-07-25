@@ -15,7 +15,7 @@ class SAC:
                  discount=0.99,
                  tau=5e-3,
                  lr=3e-4,
-                 batch_size=6,
+                 batch_size=256,
                  replay_buffer_capacity=1e5,
                  start_training=5000,
                  exploration_period=7000,
