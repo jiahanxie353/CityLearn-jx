@@ -87,10 +87,7 @@ class AttentionCritic(nn.Module):
         gradients from the critic loss function multiple times
         """
         for p in self.shared_parameters():
-            try:
-                p.grad.data.mul_(1. / self.num_agents)
-            except:
-                d = 0
+            p.grad.data.mul_(1. / self.num_agents)
 
     def forward(self, inps, agents=None, return_q=True, regularize=False):
         """
