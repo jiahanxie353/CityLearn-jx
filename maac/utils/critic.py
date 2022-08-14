@@ -49,7 +49,7 @@ class AttentionCritic(nn.Module):
                 pass
             s_encoder.add_module('state encoder fc 1', nn.Linear(state_dim, hidden_dim))
             s_encoder.add_module('state encoder activation', nn.LeakyReLU())
-            self.sa_encoders.append(s_encoder)
+            self.s_encoders.append(s_encoder)
 
             sa_encoder = nn.Sequential()
             if norm_in:
