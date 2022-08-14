@@ -49,12 +49,11 @@ def run(config, logger_kwargs=dict()):
     model = AttentionSAC.init_from_env(env, state_dim, config.buffer_length)
 
     # Count variables (protip: try to get a feel for how different size networks behave!)
-    var_counts = tuple(count_vars(module) for module in [model.critic1, model.critic2,
-                                                         model.agents[0].policy, model.agents[4].policy])
-    logger.log('\nNumber of parameters: \t critic1: %d, \t critic2: %d, \t pi[0]: %d, \t pi[4]: %d\n' % var_counts)
+    var_counts = tuple(count_vars(module) for module in [model.critic, model.agents[0].policy, model.agents[4].policy])
+    logger.log('\nNumber of parameters: \t critic1: %d, \t pi[0]: %d, \t pi[4]: %d\n' % var_counts)
 
     # Set up model saving
-    logger.setup_pytorch_saver(model.critic1)
+    logger.setup_pytorch_saver(model.critic)
     logger.setup_pytorch_saver(model.agents[0].policy)
 
     start_time = time.time()
