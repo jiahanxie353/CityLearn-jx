@@ -38,6 +38,7 @@ class AttentionCritic(nn.Module):
         self.sa_encoders = nn.ModuleList()
         self.critics = nn.ModuleList()
         self.values = nn.ModuleList()
+        attend_dim = hidden_dim // attend_heads
 
         # iterate over agents
         for state_dim, action_dim in sa_sizes:
@@ -68,12 +69,11 @@ class AttentionCritic(nn.Module):
             self.critics.append(critic)
 
             value = nn.Sequential()
-            value.add_module('value fc 1', nn.Linear(2 * hidden_dim, hidden_dim))
+            value.add_module('value fc 1', nn.Linear(attend_dim + hidden_dim, hidden_dim))
             value.add_module('value activation 1', nn.LeakyReLU())
             value.add_module('value fc 2', nn.Linear(hidden_dim, output_dim))
             self.values.append(value)
 
-            attend_dim = hidden_dim // attend_heads
             self.key_extractors = nn.ModuleList()
             self.selector_extractors = nn.ModuleList()
             self.value_extractors = nn.ModuleList()
@@ -84,6 +84,10 @@ class AttentionCritic(nn.Module):
                 self.value_extractors.append(nn.Sequential(nn.Linear(hidden_dim,
                                                                      attend_dim),
                                                            nn.LeakyReLU()))
+
+            self.separate_key_extractor = nn.Linear(hidden_dim, attend_dim, bias=False)
+            self.separate_selector_extractor = nn.Linear(hidden_dim, attend_dim, bias=False)
+            self.separate_value_extractor = nn.Sequential(nn.Linear(hidden_dim, attend_dim), nn.LeakyReLU())
 
             self.shared_modules = [self.key_extractors, self.selector_extractors,
                                    self.value_extractors, self.sa_encoders]
@@ -150,12 +154,31 @@ class AttentionCritic(nn.Module):
                 other_all_values[i].append(other_values)
                 all_attend_logits[i].append(attend_logits)
 
+        separate_keys = [self.separate_key_extractor(enc) for enc in sa_encodings]
+        separate_values = [self.separate_value_extractor(enc) for enc in sa_encodings]
+        separate_head_selector = [self.separate_selector_extractor(enc) for i, enc in enumerate(s_encodings) if i in agents]
+
+        other_all_values_bsl = [[] for _ in range(len(agents))]
+        all_attend_logits_bsl = [[] for _ in range(len(agents))]
+
+        for i, a_i, selector in zip(range(len(agents)), agents, separate_head_selector):
+            keys_bsl = [k for j, k in enumerate(separate_keys)]
+            values_bsl = [v for j, v in enumerate(separate_values)]
+            attend_logits_bsl = torch.matmul(selector.view(selector.shape[0], 1, -1),
+                                             torch.stack(keys_bsl).permute(1, 2, 0))
+            scaled_attend_logits_bsl = attend_logits_bsl / np.sqrt(keys_bsl[0].shape[1])
+            attend_weights_bsl = F.softmax(scaled_attend_logits_bsl, dim=2)
+            other_values_bsl = (torch.stack(values_bsl).permute(1, 2, 0) *
+                                attend_weights_bsl).sum(dim=2)
+            other_all_values_bsl[i].append(other_values_bsl)
+            all_attend_logits_bsl[i].append(attend_logits_bsl)
+
         # calculate Q per agent
         all_rets = []
         for i, a_i in enumerate(agents):
             agent_rets = []
             critic_in = torch.cat((sa_encodings[i], *other_all_values[i]), dim=1)
-            value_in = torch.cat((s_encodings[i], *other_all_values[i]), dim=1)
+            value_in = torch.cat((s_encodings[i], *other_all_values_bsl[i]), dim=1)
             one_q = self.critics[a_i](critic_in)
             one_v = self.values[a_i](value_in)
             if return_q:
