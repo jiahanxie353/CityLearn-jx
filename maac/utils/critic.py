@@ -37,11 +37,19 @@ class AttentionCritic(nn.Module):
         self.s_encoders = nn.ModuleList()
         self.sa_encoders = nn.ModuleList()
         self.critics = nn.ModuleList()
+        self.values = nn.ModuleList()
 
         # iterate over agents
         for state_dim, action_dim in sa_sizes:
             input_dim = state_dim + action_dim
             output_dim = 1
+
+            s_encoder = nn.Sequential()
+            if norm_in:
+                pass
+            s_encoder.add_module('state encoder fc 1', nn.Linear(state_dim, hidden_dim))
+            s_encoder.add_module('state encoder activation', nn.LeakyReLU())
+            self.s_encoders.append(s_encoder)
 
             sa_encoder = nn.Sequential()
             if norm_in:
@@ -58,6 +66,12 @@ class AttentionCritic(nn.Module):
             critic.add_module('critic activation 1', nn.LeakyReLU())
             critic.add_module('critic fc 2', nn.Linear(hidden_dim, output_dim))
             self.critics.append(critic)
+
+            value = nn.Sequential()
+            value.add_module('value fc 1', nn.Linear(2 * hidden_dim, hidden_dim))
+            value.add_module('value activation 1', nn.LeakyReLU())
+            value.add_module('value fc 2', nn.Linear(hidden_dim, output_dim))
+            self.values.append(value)
 
             attend_dim = hidden_dim // attend_heads
             self.key_extractors = nn.ModuleList()
@@ -87,12 +101,9 @@ class AttentionCritic(nn.Module):
         gradients from the critic loss function multiple times
         """
         for p in self.shared_parameters():
-            try:
-                p.grad.data.mul_(1. / self.num_agents)
-            except:
-                d = 0
+            p.grad.data.mul_(1. / self.num_agents)
 
-    def forward(self, inps, agents=None, return_q=True, regularize=False):
+    def forward(self, inps, agents=None, return_q=True, return_v=True, regularize=False):
         """
         Inputs:
         :param inps: (list of PyTorch matrices) Inputs to each agent's encoder (batch of obs + ac)
@@ -106,6 +117,7 @@ class AttentionCritic(nn.Module):
         if agents is None:
             agents = range(len(self.sa_encoders))
         states = [s for s, a in inps]
+        s_encodings = [self.s_encoders[a_i](states[a_i]) for a_i in agents]
         inps = [torch.cat((s, a), dim=1) for s, a in inps]
         # extract state-action encoding for each agent
         sa_encodings = [sa_encoder(inp) for sa_encoder, inp in zip(self.sa_encoders, inps)]
@@ -143,9 +155,13 @@ class AttentionCritic(nn.Module):
         for i, a_i in enumerate(agents):
             agent_rets = []
             critic_in = torch.cat((sa_encodings[i], *other_all_values[i]), dim=1)
+            value_in = torch.cat((s_encodings[i], *other_all_values[i]), dim=1)
             one_q = self.critics[a_i](critic_in)
+            one_v = self.values[a_i](value_in)
             if return_q:
                 agent_rets.append(one_q)
+            if return_v:
+                agent_rets.append(one_v)
             if regularize:
                 # regularize magnitude of attention logits
                 attend_magn_reg = 1e-3 * sum((logit ** 2).mean() for logit in all_attend_logits[i])
