@@ -191,7 +191,7 @@ class AttentionSAC(object):
                 if len(log_pi.shape) == 1:
                     log_pi = log_pi.unsqueeze(dim=-1)
                 pi_target = q_pi - val
-                loss_pi.append((self.alpha * log_pi - pi_target).mean())
+                loss_pi.append((log_pi*(self.alpha * log_pi - pi_target)).mean())
 
                 disable_gradients(self.critic)
                 loss_pi[a_i].backward(retain_graph=True)
