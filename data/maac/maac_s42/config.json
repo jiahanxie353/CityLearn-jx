@@ -1,6 +1,6 @@
 {
     "config":	{
-        "Namespace(batch_size=64, buffer_length=1000000, climate_zone=5, env_id='5', episode_length=200, exp_name='maac', exploration=100, n_episodes=3, num_updates=1, seed=42, update_after=80, update_every=10)":	{
+        "Namespace(batch_size=64, buffer_length=1000000, climate_zone=5, env_id='5', episode_length=200, exp_name='maac', exploration=100, n_episodes=5, num_updates=1, seed=42, update_after=80, update_every=2)":	{
             "batch_size":	64,
             "buffer_length":	1000000,
             "climate_zone":	5,
@@ -8,16 +8,16 @@
             "episode_length":	200,
             "exp_name":	"maac",
             "exploration":	100,
-            "n_episodes":	3,
+            "n_episodes":	5,
             "num_updates":	1,
             "seed":	42,
             "update_after":	80,
-            "update_every":	10
+            "update_every":	2
         }
     },
     "exp_name":	"maac",
     "logger":	{
-        "<logger.logx.EpochLogger object at 0x155380fa0>":	{
+        "<logger.logx.EpochLogger object at 0x177eeb610>":	{
             "epoch_dict":	{},
             "exp_name":	"maac",
             "first_row":	true,
