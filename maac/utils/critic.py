@@ -141,8 +141,8 @@ class AttentionCritic(nn.Module):
                 all_head_keys, all_head_values, all_head_selectors):
             # iterate over agents
             for i, a_i, selector in zip(range(len(agents)), agents, curr_head_selectors):
-                keys = [k for j, k in enumerate(curr_head_keys)]
-                values = [v for j, v in enumerate(curr_head_values)]
+                keys = [k for j, k in enumerate(curr_head_keys) if j != a_i]
+                values = [v for j, v in enumerate(curr_head_values) if j != a_i]
                 # calculate attention across agents
                 attend_logits = torch.matmul(selector.view(selector.shape[0], 1, -1),
                                              torch.stack(keys).permute(1, 2, 0))
@@ -162,8 +162,8 @@ class AttentionCritic(nn.Module):
         all_attend_logits_bsl = [[] for _ in range(len(agents))]
 
         for i, a_i, selector in zip(range(len(agents)), agents, separate_head_selector):
-            keys_bsl = [k for j, k in enumerate(separate_keys)]
-            values_bsl = [v for j, v in enumerate(separate_values)]
+            keys_bsl = [k for j, k in enumerate(separate_keys) if j != a_i]
+            values_bsl = [v for j, v in enumerate(separate_values) if j != a_i]
             attend_logits_bsl = torch.matmul(selector.view(selector.shape[0], 1, -1),
                                              torch.stack(keys_bsl).permute(1, 2, 0))
             scaled_attend_logits_bsl = attend_logits_bsl / np.sqrt(keys_bsl[0].shape[1])
