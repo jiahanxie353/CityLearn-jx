@@ -153,7 +153,7 @@ if __name__ == "__main__":
                         default=64, type=int,
                         help="Batch size for training")
     parser.add_argument("--update_after", default=80)
-    parser.add_argument("--update_every", default=10, type=int)
+    parser.add_argument("--update_every", default=50, type=int)
     parser.add_argument("--num_updates", default=1, type=int,
                         help="Number of updates per update cycle")
     parser.add_argument("--exploration", default=100, type=int)
