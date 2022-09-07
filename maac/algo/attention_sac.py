@@ -21,8 +21,8 @@ class AttentionSAC(object):
                  actor_lr: float = 0.001,
                  critic_lr: float = 0.001,
                  actor_hidden_dim: Tuple = (400, 300),
-                 critic_hidden_dim: int = 256,
-                 attend_heads: int = 4,
+                 critic_hidden_dim: int = 300,
+                 attend_heads: int = 6,
                  **kwargs):
         """
         Inputs:
