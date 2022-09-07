@@ -37,10 +37,11 @@ class reward_function_ma:
             # reward_[reward_ > 0] = 0
             # return list(reward_)
             # ramping = np.abs((self.net_electric_demand - np.roll(self.net_electric_demand, 1))[1:]).sum() / len(self.net_electric_demand)
-            # return list(ramping*np.array(electricity_demand)**3.0)
-            return list(
-                500*np.float32(min(0, total_electricity_demand) * carbon_intensity) -
-                np.sign(electricity_demand) * 0.001 * (np.array(np.abs(electricity_demand)) * total_electricity_demand**3))
+            # # return list(ramping*np.array(electricity_demand)**3.0)
+            # return list(
+            #     500*np.float32(min(0, total_electricity_demand) * carbon_intensity) -
+            #     np.sign(electricity_demand) * 0.001 * (np.array(np.abs(electricity_demand)) * total_electricity_demand**3))
+            return list(-np.sign(electricity_demand)*0.01*(np.array(np.abs(electricity_demand))**2 * min(0, total_electricity_demand)))
 
 
 # Do not use or delete

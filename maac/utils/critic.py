@@ -69,7 +69,7 @@ class AttentionCritic(nn.Module):
             self.critics.append(critic)
 
             value = nn.Sequential()
-            value.add_module('value fc 1', nn.Linear(attend_dim + hidden_dim, hidden_dim))
+            value.add_module('value fc 1', nn.Linear(attend_dim, hidden_dim))
             value.add_module('value activation 1', nn.LeakyReLU())
             value.add_module('value fc 2', nn.Linear(hidden_dim, output_dim))
             self.values.append(value)
@@ -178,7 +178,7 @@ class AttentionCritic(nn.Module):
         for i, a_i in enumerate(agents):
             agent_rets = []
             critic_in = torch.cat((sa_encodings[i], *other_all_values[i]), dim=1)
-            value_in = torch.cat((s_encodings[i], *other_all_values_bsl[i]), dim=1)
+            value_in = torch.cat((*other_all_values_bsl[i][-1],)).view(64,-1)
             one_q = self.critics[a_i](critic_in)
             one_v = self.values[a_i](value_in)
             if return_q:
