@@ -8,6 +8,7 @@ class ReplayBuffer(object):
     """
     Replay buffer
     """
+
     def __init__(self, capacity):
         self.capacity = capacity
         self.buffer = []
@@ -41,3 +42,26 @@ class ReplayBuffer(object):
 
     def __len__(self):
         return len(self.buffer)
+
+
+class RegressionBuffer:
+    """
+    Regression buffer for electricity prediction
+    """
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.x = []
+        self.y = []
+        self.position = 0
+
+    def push(self, variables, targets):
+        if len(self.x) < self.capacity and len(self.x) == len(self.y):
+            self.x.append(None)
+            self.y.append(None)
+
+        self.x[self.position] = variables
+        self.y[self.position] = targets
+        self.position = (self.position + 1) % self.capacity
+
+    def __len__(self):
+        return len(self.x)
