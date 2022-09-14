@@ -101,11 +101,11 @@ def encode(env):
         encoder_reg[uid] = encoder_reg[uid][encoder_reg[uid] != 0]
         encoder_reg[uid][encoder_reg[uid] == -1] = RemoveFeature()
 
-        state_dim[uid] = len(
+        state_dim[uid] = 1 + len(
             [j for j in np.hstack(encoder[uid] * np.ones(len(observation_spaces[uid].low))) if
              j is not None])
 
-    return encoder, state_dim
+    return encoder, encoder_reg, state_dim
 
 
 def normalize(normed, normalizer):
