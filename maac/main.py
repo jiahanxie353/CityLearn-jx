@@ -8,7 +8,7 @@ from logger.logx import EpochLogger
 from logger.plotting import EpisodeStats, plot_episode_stats
 from utils.make_env import make_env
 from utils.encoder import encode
-from utils.misc import count_vars
+from utils.misc import count_vars, unzip_list_of_tuples
 
 
 def make_parallel_env(env_id, climate_zone):
@@ -44,9 +44,10 @@ def run(config, logger_kwargs=dict()):
 
     env = make_parallel_env(config.env_id, config.climate_zone)
 
-    encoder, state_dim = encode(env)
+    encoder, encoder_reg, state_dim = encode(env)
 
-    model = AttentionSAC.init_from_env(env, state_dim, config.buffer_length)
+    model = AttentionSAC.init_from_env(env, state_dim, config.buffer_length,
+                                       config.reg_buffer_length, config.start_regression, config.regression_freq)
 
     # Count variables (protip: try to get a feel for how different size networks behave!)
     var_counts = tuple(count_vars(module) for module in [model.critic1, model.critic2,
@@ -75,37 +76,46 @@ def run(config, logger_kwargs=dict()):
         ep_ret = 0
         env = make_parallel_env(config.env_id, config.climate_zone)
         obs = env.reset()
+        agent_actions, expected_demand = unzip_list_of_tuples(
+            model.step(obs, encoder, encoder_reg, t, explore=explore, deterministic=deterministic))
 
         for et_i in range(config.episode_length):
             if et_i % 200 == 0:
                 print("Episode time %i of %i" % (et_i + 1, config.episode_length))
-            torch_obs = [Variable(torch.Tensor(np.hstack(obs[i])),
+            # Send actions to all parallel environments and get o'_{i}^{e}, r'_{i}^{e} for all agents
+            next_obs, rewards, dones, _ = env.step(agent_actions)
+            torch_obs = [Variable(torch.Tensor(np.hstack(next_obs[i])),
                                   requires_grad=False)
                          for i in range(model.num_agents)]
 
             # Select actions a_{i}^{e} ~ pi_{i}(·|o_{i}^{e}) for each agent, i, in each environment, e
-            agent_actions = model.step(torch_obs, encoder, explore=explore, deterministic=deterministic)
+            agent_next_actions, expected_demand_next = unzip_list_of_tuples(
+                model.step(torch_obs, encoder, encoder_reg, t, explore=explore, deterministic=deterministic))
 
-            # Send actions to all parallel environments and get o'_{i}^{e}, r'_{i}^{e} for all agents
-            next_obs, rewards, dones, _ = env.step(agent_actions)
+            # # Send actions to all parallel environments and get o'_{i}^{e}, r'_{i}^{e} for all agents
+            # next_obs, rewards, dones, _ = env.step(agent_actions)
+
             if (et_i + 1) % 50 == 0:
                 print(np.array(rewards).mean())
             ep_ret += np.array(rewards).mean()
 
-            model.add_to_buffer(encoder, obs, agent_actions, rewards, next_obs, dones)
+            model.add_to_buffer(encoder, encoder_reg, obs, agent_actions, rewards, next_obs, dones, t,
+                                expected_demand, expected_demand_next)
 
+            expected_demand = expected_demand_next
             obs = next_obs
+            agent_actions = agent_next_actions
 
             explore = (t <= config.exploration)
             deterministic = (t >= config.episode_length * 0.75)
 
             t += 1
 
-            if t <= 100:
+            if t <= config.exploration:
                 assert explore
-            elif 101 <= t <= 150:
+            elif config.exploration <= t <= 300*0.75:
                 assert not deterministic
-            elif 151 <= t <= 600:
+            elif 300*0.75 <= t <= 300:
                 assert not explore and deterministic
 
             # Update statistics
@@ -147,9 +157,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Multi-Agent Actor-Attention-Critic")
     parser.add_argument("--env_id", default="5", help="Name of environment")
     parser.add_argument("--buffer_length", default=int(1e6), type=int)
+    parser.add_argument("--reg_buffer_length", default=int(3e4), type=int)
+    parser.add_argument("--start_regression", default=50, type=int)
+    parser.add_argument("--regression_freq", default=50, type=int)
     parser.add_argument("--n_episodes", default=3, type=int)
     parser.add_argument("--climate_zone", default=5, type=int)
-    parser.add_argument("--episode_length", default=200, type=int)
+    parser.add_argument("--episode_length", default=300, type=int)
     parser.add_argument("--batch_size",
                         default=64, type=int,
                         help="Batch size for training")
@@ -157,7 +170,7 @@ if __name__ == "__main__":
     parser.add_argument("--update_every", default=10, type=int)
     parser.add_argument("--num_updates", default=1, type=int,
                         help="Number of updates per update cycle")
-    parser.add_argument("--exploration", default=100, type=int)
+    parser.add_argument("--exploration", default=120, type=int)
     parser.add_argument("--exp_name", type=str, default="maac")
     parser.add_argument("--seed", type=int, default=42)
 
