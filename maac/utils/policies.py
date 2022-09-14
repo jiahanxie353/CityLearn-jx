@@ -90,10 +90,15 @@ class SquashedGaussianActor(nn.Module):
         mu = torch.tanh(mu) * self.action_scale + self.action_bias
         return action, log_pi, mu
 
-    def choose_action(self, obs, action_spaces, encoder, norm_mean, norm_std, explore=True, deterministic=False):
+    def choose_action(self, obs, action_spaces, encoder, encoder_reg, time_step, start_regression, elec_estimator,
+                      norm_mean, norm_std, explore=True, deterministic=False):
         """
         Agent chooses an action to take a step. If explore, we just sample from the action spaces; if deterministic,
         we first normalize the states and pass through the policy net to get an action base on the network output
+        :param start_regression:
+        :param time_step:
+        :param elec_estimator:
+        :param encoder_reg:
         :param obs:
         :param action_spaces:
         :param encoder:
@@ -103,6 +108,16 @@ class SquashedGaussianActor(nn.Module):
         :param deterministic:
         :return:
         """
+        expected_demand = 0.
+        if time_step > start_regression:
+            try:
+                if torch.is_tensor(obs):
+                    x_reg = np.array([j for j in np.hstack(encoder_reg * obs.detach().numpy()) if j is not None][:-1])
+                else:
+                    x_reg = np.array([j for j in np.hstack(encoder_reg * obs) if j is not None][:-1])
+            except:
+                d = 0
+            expected_demand = elec_estimator.predict(x_reg.reshape(1, -1))
         if explore:
             multiplier = 0.32
             hour_day = obs[2]
@@ -123,10 +138,15 @@ class SquashedGaussianActor(nn.Module):
                 act = [0.085 * multiplier for _ in range(a_dim)]
             elif 1 <= hour_day <= 6:
                 act = [0.1383 * multiplier for _ in range(a_dim)]
-            return act
+            return act, expected_demand
         else:
             state_normalizer = [norm_mean, norm_std]
-            obs_ = np.array([j for j in np.hstack(encoder * obs.detach().numpy()) if j is not None])
+            if torch.is_tensor(obs):
+                obs_ = np.array([j for j in np.hstack(encoder * obs.detach().numpy()) if j is not None])
+            else:
+                obs_ = np.array([j for j in np.hstack(encoder * obs) if j is not None])
+            if time_step > start_regression:
+                obs_ = np.hstack(np.concatenate((obs_, expected_demand)))
             obs_ = normalize(obs_, state_normalizer)
             obs_ = torch.FloatTensor(obs_).unsqueeze(0).to(self.device)
 
@@ -135,4 +155,4 @@ class SquashedGaussianActor(nn.Module):
             else:
                 act, _, _ = self.sample(obs_)
 
-            return act.detach().cpu().numpy()[0]
+            return act.detach().cpu().numpy()[0], np.array(expected_demand)
