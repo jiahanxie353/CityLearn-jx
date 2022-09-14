@@ -112,3 +112,8 @@ class RemoveFeature:
 
 def count_vars(module):
     return sum([np.prod(p.shape) for p in module.parameters()])
+
+
+def unzip_list_of_tuples(list_of_tuples):
+    ret_ = [[a for a, _ in list_of_tuples], [b for _, b in list_of_tuples]]
+    return ret_[0], ret_[1]
