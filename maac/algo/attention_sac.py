@@ -30,7 +30,6 @@ class AttentionSAC(object):
         self.num_agents = len(sa_size)
         self.agent_init_params = agent_init_params
         self.agents = [AttentionAgent(lr=actor_lr,
-                                      norm_flag=0,
                                       hidden_dim=actor_hidden_dim,
                                       **params)
                        for params in agent_init_params]
@@ -79,17 +78,19 @@ class AttentionSAC(object):
         """
         return [a.target_policy for a in self.agents]
 
-    def step(self, observations, encoder, explore=False, deterministic=False):
+    def step(self, observations, encoder, encoder_reg, time_step, explore=False, deterministic=False):
         """
         Each agent takes a step in the environment
+        :param time_step:
+        :param encoder_reg:
         :param observations:
         :param encoder:
         :param explore:
         :param deterministic
         :return:
         """
-        return [a.step(obs, a.action_spaces, e, explore=explore, deterministic=deterministic)
-                for a, e, obs in zip(self.agents, encoder.values(), observations)]
+        return [a.step(obs, a.action_spaces, e, e_r, time_step, explore=explore, deterministic=deterministic)
+                for a, e, e_r, obs in zip(self.agents, encoder.values(), encoder_reg.values(), observations)]
 
     def update_critics(self, samples):
         """
@@ -240,9 +241,14 @@ class AttentionSAC(object):
         """
         return [a.normalize_buffer() for a in self.agents]
 
-    def add_to_buffer(self, encoder, observations, actions, rewards, next_observations, done):
+    def add_to_buffer(self, encoder, encoder_reg, observations, actions, rewards, next_observations, done, time_step,
+                      expected_demands, expected_demands_next):
         """
         Add the observation encoder, obs, act, rew, next_obs into the replay buffer of each agent.
+        :param time_step:
+        :param expected_demands_next:
+        :param expected_demands:
+        :param encoder_reg:
         :param encoder:
         :param observations:
         :param actions:
@@ -251,8 +257,10 @@ class AttentionSAC(object):
         :param done:
         :return:
         """
-        [a.add_to_buffer(e, obs, act, rew, next_obs, done) for a, e, obs, act, rew, next_obs
-         in zip(self.agents, encoder.values(), observations, actions, rewards, next_observations)]
+        [a.add_to_buffer(e, e_r, obs, act, rew, next_obs, done, time_step, expected_demand, expected_demand_next)
+         for a, e, e_r, obs, act, rew, next_obs, expected_demand, expected_demand_next
+         in zip(self.agents, encoder.values(), encoder_reg.values(),
+                observations, actions, rewards, next_observations, expected_demands, expected_demands_next)]
 
     def replay_buffer_length(self):
         """
@@ -270,9 +278,12 @@ class AttentionSAC(object):
         return [a.replay_buffer.sample(batch_size) for a in self.agents]
 
     @classmethod
-    def init_from_env(cls, env, state_dim, buffer_length):
+    def init_from_env(cls, env, state_dim, buffer_length, reg_buffer_length, start_regression, regression_frequency):
         """
         Instantiate instance of this class from CityLearn environment
+        :param regression_frequency:
+        :param start_regression:
+        :param reg_buffer_length:
         :param env:
         :param state_dim
         :param buffer_length
@@ -292,7 +303,10 @@ class AttentionSAC(object):
                                       "dim_out_actor": act_space.shape[0],
                                       "action_spaces": act_space,
                                       "action_scaling_coef": 1.,
-                                      "buffer_length": buffer_length})
+                                      "buffer_length": buffer_length,
+                                      "reg_buffer_length": reg_buffer_length,
+                                      "start_regression": start_regression,
+                                      "regression_frequency": regression_frequency})
         init_dict = {
             "sa_size": sa_size,
             "agent_init_params": agent_init_params
