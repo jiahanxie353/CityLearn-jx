@@ -552,7 +552,7 @@ params = {'data_path': Path("/Users/xiejiahan/PycharmProjects/CityLearn/data/Cli
           'building_attributes': 'building_attributes.json',
           'weather_file': 'weather_data.csv',
           'solar_profile': 'solar_generation_1kW.csv',
-          'carbon_intensity': 'carbon_intensity.csv',
+          'carbon_intensity': 'CarbonIntensity.csv',
           'building_ids': ["Building_" + str(i) for i in [1, 2, 3, 4, 5, 6, 7, 8, 9]],
           'buildings_states_actions': '/Users/xiejiahan/PycharmProjects/CityLearn/buildings_state_action_space'
                                       '.json',
