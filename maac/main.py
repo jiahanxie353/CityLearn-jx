@@ -145,10 +145,10 @@ def run(config, logger_kwargs=dict()):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Multi-Agent Actor-Attention-Critic")
-    parser.add_argument("--env_id", default="5", help="Name of environment")
+    parser.add_argument("--env_id", default="0", help="Name of environment")
     parser.add_argument("--buffer_length", default=int(1e6), type=int)
     parser.add_argument("--n_episodes", default=3, type=int)
-    parser.add_argument("--climate_zone", default=5, type=int)
+    parser.add_argument("--climate_zone", default=0, type=int)
     parser.add_argument("--episode_length", default=200, type=int)
     parser.add_argument("--batch_size",
                         default=64, type=int,
