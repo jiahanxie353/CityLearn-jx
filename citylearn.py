@@ -93,8 +93,8 @@ def auto_size(buildings):
             building.cooling_storage.capacity = 0.00001
 
 
-def building_loader(data_path, building_attributes, weather_file, solar_profile, carbon_intensity, building_ids,
-                    buildings_states_actions, save_memory=True):
+def building_loader(data_path, building_attributes, weather_file, solar_profile, carbon_intensity, electricity_price,
+                    building_ids, buildings_states_actions, save_memory=True):
     with open(building_attributes) as json_file:
         data = json.load(json_file)
 
@@ -197,6 +197,11 @@ def building_loader(data_path, building_attributes, weather_file, solar_profile,
                 data = pd.read_csv(csv_file)
 
             building.sim_results['carbon_intensity'] = list(data['kg_CO2/kWh'])
+
+            with open(electricity_price) as csv_file:
+                data = pd.read_csv(csv_file)
+
+            building.sim_results['electricity_price'] = list(data['Price'])
 
             # Finding the max and min possible values of all the states, which can then be used by the RL agent to scale the states and train any function approximators more effectively
             s_low, s_high = [], []
