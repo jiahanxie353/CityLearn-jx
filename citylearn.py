@@ -620,12 +620,12 @@ class CityLearn(gym.Env):
             self.state = np.array(self.state, dtype='object')
 
             rewards = self.reward_function.get_rewards(self.buildings_net_electricity_demand,
-                                                       self.current_carbon_intensity)
+                                                       self.current_carbon_intensity, self.current_electricity_price)
             self.cumulated_reward_episode += sum(rewards)
 
         # Control variables which are used to display the results and the behavior of the buildings at district level
         self.carbon_emissions.append(np.float32(max(0, electric_demand) * self.current_carbon_intensity))
-        self.electricity_costs.append(np.float32(max, electric_demand) * self.current_electricity_price)
+        self.electricity_costs.append(np.float32(max(0, electric_demand) * self.current_electricity_price))
         self.net_electric_consumption.append(np.float32(electric_demand))
         self.electric_consumption_electric_storage.append(np.float32(elec_consumption_electrical_storage))
         self.electric_consumption_dhw_storage.append(np.float32(elec_consumption_dhw_storage))
@@ -858,7 +858,7 @@ class CityLearn(gym.Env):
 
             if self.simulation_period[1] - self.simulation_period[0] > 8760:
                 cost_last_yr['electricity_costs_last_yr'] = np.array(self.electricity_costs[-8760:]).sum() / \
-                                                            self.cost_rbc_last_yr['electricity_costs']
+                                                            self.cost_rbc_last_yr['electricity_costs_last_yr']
 
         # Not used for the challenge
         if 'quadratic' in self.cost_function:
