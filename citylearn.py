@@ -756,7 +756,7 @@ class CityLearn(gym.Env):
         # Running the reference rule-based controller to find the baseline cost
         if self.cost_rbc is None:
             env_rbc = CityLearn(self.data_path, self.building_attributes, self.weather_file, self.solar_profile,
-                                self.building_ids, carbon_intensity=self.carbon_intensity,
+                                self.building_ids, carbon_intensity=self.carbon_intensity, electricity_price=self.electricity_price,
                                 buildings_states_actions=self.buildings_states_actions_filename,
                                 simulation_period=self.simulation_period, cost_function=self.cost_function,
                                 central_agent=False)
@@ -832,7 +832,7 @@ class CityLearn(gym.Env):
 
             if self.simulation_period[1] - self.simulation_period[0] > 8760:
                 cost_last_yr['peak_demand_last_yr'] = np.array(self.net_electric_consumption[-8760:]).max() / \
-                                                      self.cost_rbc_last_yr['peak_demand_last_yr']
+                                                    self.cost_rbc_last_yr['peak_demand_last_yr']
                 c_score_last_yr.append(cost_last_yr['peak_demand_last_yr'])
 
         # Positive net electricity consumption for the whole district. It is clipped at a min. value of 0 because the
@@ -840,8 +840,7 @@ class CityLearn(gym.Env):
         # Island operation is therefore incentivized)
         if 'net_electricity_consumption' in self.cost_function:
             cost['net_electricity_consumption'] = np.array(self.net_electric_consumption).clip(min=0).sum() / \
-                                                  self.cost_rbc[
-                                                      'net_electricity_consumption']
+                                                self.cost_rbc['net_electricity_consumption']
 
             if self.simulation_period[1] - self.simulation_period[0] > 8760:
                 cost_last_yr['net_electricity_consumption_last_yr'] = np.array(
@@ -853,8 +852,13 @@ class CityLearn(gym.Env):
 
             if self.simulation_period[1] - self.simulation_period[0] > 8760:
                 cost_last_yr['carbon_emissions_last_yr'] = np.array(self.carbon_emissions[-8760:]).sum() / \
-                                                           self.cost_rbc_last_yr[
-                                                               'carbon_emissions_last_yr']
+                                                            self.cost_rbc_last_yr['carbon_emissions_last_yr']
+        if 'electricity_costs' in self.cost_function:
+            cost['electricity_costs'] = np.array(self.electricity_costs).sum() / self.cost_rbc['electricity_costs']
+
+            if self.simulation_period[1] - self.simulation_period[0] > 8760:
+                cost_last_yr['electricity_costs_last_yr'] = np.array(self.electricity_costs[-8760:]).sum() / \
+                                                            self.cost_rbc_last_yr['electricity_costs']
 
         # Not used for the challenge
         if 'quadratic' in self.cost_function:
@@ -933,6 +937,12 @@ class CityLearn(gym.Env):
 
             if self.simulation_period[1] - self.simulation_period[0] > 8760:
                 cost_last_yr['carbon_emissions_last_yr'] = self.carbon_emissions[-8760:].sum()
+
+        if 'electricity_costs' in self.cost_function:
+            cost['electricity_costs'] = self.electricity_costs.sum()
+
+            if self.simulation_period[1] - self.simulation_period[0] > 8760:
+                cost_last_yr['electricity_costs_last_yr'] = self.electricity_costs[-8760:].sum()
 
         if 'quadratic' in self.cost_function:
             cost['quadratic'] = (self.net_electric_consumption.clip(min=0) ** 2).sum()
