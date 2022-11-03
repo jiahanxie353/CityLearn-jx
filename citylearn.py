@@ -320,7 +320,7 @@ def building_loader(data_path, building_attributes, weather_file, solar_profile,
 
 
 class CityLearn(gym.Env):
-    def __init__(self, data_path, building_attributes, weather_file, solar_profile, building_ids, carbon_intensity=None,
+    def __init__(self, data_path, building_attributes, weather_file, solar_profile, building_ids, carbon_intensity=None, electricity_price=None,
                  buildings_states_actions=None, simulation_period=(0, 8759),
                  cost_function=['ramping', '1-load_factor', 'average_daily_peak', 'peak_demand',
                                 'net_electricity_consumption', 'electricity_cost_price'], central_agent=False, save_memory=True, verbose=0):
@@ -333,6 +333,7 @@ class CityLearn(gym.Env):
         self.building_attributes = building_attributes
         self.solar_profile = solar_profile
         self.carbon_intensity = carbon_intensity
+        self.electricity_price = electricity_price
         self.building_ids = building_ids
         self.cost_function = cost_function
         self.cost_rbc = None
@@ -346,6 +347,7 @@ class CityLearn(gym.Env):
                          'weather_file': self.data_path / self.weather_file,
                          'solar_profile': self.data_path / self.solar_profile,
                          'carbon_intensity': self.data_path / self.carbon_intensity,
+                         'electricity_price': self.data_path / self.electricity_price,
                          'building_ids': building_ids,
                          'buildings_states_actions': self.buildings_states_actions,
                          'save_memory': save_memory}
