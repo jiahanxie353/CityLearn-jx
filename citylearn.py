@@ -323,7 +323,7 @@ class CityLearn(gym.Env):
     def __init__(self, data_path, building_attributes, weather_file, solar_profile, building_ids, carbon_intensity=None, electricity_price=None,
                  buildings_states_actions=None, simulation_period=(0, 8759),
                  cost_function=['ramping', '1-load_factor', 'average_daily_peak', 'peak_demand',
-                                'net_electricity_consumption', 'electricity_cost_price'], central_agent=False, save_memory=True, verbose=0):
+                                'net_electricity_consumption', 'electricity_costs'], central_agent=False, save_memory=True, verbose=0):
         with open(buildings_states_actions) as json_file:
             self.buildings_states_actions = json.load(json_file)
 
@@ -407,6 +407,7 @@ class CityLearn(gym.Env):
 
         self.buildings_net_electricity_demand = []
         self.current_carbon_intensity = list(self.buildings.values())[0].sim_results['carbon_intensity'][self.time_step]
+        self.current_electricity_price = list(self.buildings.values())[0].sim_results['electricity_price'][self.time_step]
         electric_demand = 0
         elec_consumption_electrical_storage = 0
         elec_consumption_dhw_storage = 0
@@ -622,9 +623,9 @@ class CityLearn(gym.Env):
                                                        self.current_carbon_intensity)
             self.cumulated_reward_episode += sum(rewards)
 
-        # Control variables which are used to display the results and the behavior of the buildings at the district
-        # level.
+        # Control variables which are used to display the results and the behavior of the buildings at district level
         self.carbon_emissions.append(np.float32(max(0, electric_demand) * self.current_carbon_intensity))
+        self.electricity_costs.append(np.float32(max, electric_demand) * self.current_electricity_price)
         self.net_electric_consumption.append(np.float32(electric_demand))
         self.electric_consumption_electric_storage.append(np.float32(elec_consumption_electrical_storage))
         self.electric_consumption_dhw_storage.append(np.float32(elec_consumption_dhw_storage))
@@ -651,6 +652,7 @@ class CityLearn(gym.Env):
         self.next_hour()
 
         self.carbon_emissions = []
+        self.electricity_costs= []
         self.net_electric_consumption = []
         self.net_electric_consumption_no_storage = []
         self.net_electric_consumption_no_pv_no_storage = []
@@ -724,6 +726,7 @@ class CityLearn(gym.Env):
 
             # When the simulation is over, convert all the control variables to numpy arrays so they are easier to plot.
             self.carbon_emissions = np.array(self.carbon_emissions)
+            self.electricity_costs = np.array(self.electricity_costs)
             self.net_electric_consumption = np.array(self.net_electric_consumption)
             self.net_electric_consumption_no_storage = np.array(self.net_electric_consumption_no_storage)
             self.net_electric_consumption_no_pv_no_storage = np.array(self.net_electric_consumption_no_pv_no_storage)
