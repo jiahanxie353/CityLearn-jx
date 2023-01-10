@@ -13,7 +13,7 @@ class reward_function_ma:
         self.net_electric_demand = []
 
     # electricity_demand contains negative values when the building consumes more electricity than it generates
-    def get_rewards(self, electricity_demand, carbon_intensity):
+    def get_rewards(self, electricity_demand, carbon_intensity, electricity_price):
         
         # You can edit what comes next and customize it for The CityLearn Challenge
         electricity_demand = np.float32(electricity_demand)
@@ -28,7 +28,7 @@ class reward_function_ma:
         # Use this reward function when running the MARLISA example with information_sharing = True. The reward sent
         # to each agent will have an individual and a collective component.
         if using_marlisa:
-            return list(np.sign(electricity_demand)*0.01*(np.array(np.abs(electricity_demand))**2 * max(0, total_electricity_demand)))
+            return list(electricity_price*np.sign(electricity_demand)*0.01*(np.array(np.abs(electricity_demand))**2 * max(0, total_electricity_demand)))
         
         else:
             # Use this reward when running the SAC example. It assumes that the building-agents act independently of
@@ -38,9 +38,11 @@ class reward_function_ma:
             # return list(reward_)
             # ramping = np.abs((self.net_electric_demand - np.roll(self.net_electric_demand, 1))[1:]).sum() / len(self.net_electric_demand)
             # return list(ramping*np.array(electricity_demand)**3.0)
-            return list(
-                500*np.float32(min(0, total_electricity_demand) * carbon_intensity) -
-                np.sign(electricity_demand) * 0.001 * (np.array(np.abs(electricity_demand)) * total_electricity_demand**3))
+            # return list(
+            #     500*np.float32(min(0, total_electricity_demand) * electricity_price) -
+            #     np.sign(electricity_demand) * 0.001 * (np.array(np.abs(electricity_demand)) * total_electricity_demand**3))
+            return list(electricity_price * np.sign(electricity_demand) * 0.01 * (
+                        np.array(np.abs(electricity_demand))*total_electricity_demand**2))
 
 
 # Do not use or delete

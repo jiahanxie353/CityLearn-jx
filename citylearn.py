@@ -93,8 +93,8 @@ def auto_size(buildings):
             building.cooling_storage.capacity = 0.00001
 
 
-def building_loader(data_path, building_attributes, weather_file, solar_profile, carbon_intensity, building_ids,
-                    buildings_states_actions, save_memory=True):
+def building_loader(data_path, building_attributes, weather_file, solar_profile, carbon_intensity, electricity_price,
+                    building_ids, buildings_states_actions, save_memory=True):
     with open(building_attributes) as json_file:
         data = json.load(json_file)
 
@@ -197,6 +197,11 @@ def building_loader(data_path, building_attributes, weather_file, solar_profile,
                 data = pd.read_csv(csv_file)
 
             building.sim_results['carbon_intensity'] = list(data['kg_CO2/kWh'])
+
+            with open(electricity_price) as csv_file:
+                data = pd.read_csv(csv_file)
+
+            building.sim_results['electricity_price'] = list(data['Price'])
 
             # Finding the max and min possible values of all the states, which can then be used by the RL agent to scale the states and train any function approximators more effectively
             s_low, s_high = [], []
@@ -315,10 +320,10 @@ def building_loader(data_path, building_attributes, weather_file, solar_profile,
 
 
 class CityLearn(gym.Env):
-    def __init__(self, data_path, building_attributes, weather_file, solar_profile, building_ids, carbon_intensity=None,
+    def __init__(self, data_path, building_attributes, weather_file, solar_profile, building_ids, carbon_intensity=None, electricity_price=None,
                  buildings_states_actions=None, simulation_period=(0, 8759),
                  cost_function=['ramping', '1-load_factor', 'average_daily_peak', 'peak_demand',
-                                'net_electricity_consumption'], central_agent=False, save_memory=True, verbose=0):
+                                'net_electricity_consumption', 'electricity_costs'], central_agent=False, save_memory=True, verbose=0):
         with open(buildings_states_actions) as json_file:
             self.buildings_states_actions = json.load(json_file)
 
@@ -328,6 +333,7 @@ class CityLearn(gym.Env):
         self.building_attributes = building_attributes
         self.solar_profile = solar_profile
         self.carbon_intensity = carbon_intensity
+        self.electricity_price = electricity_price
         self.building_ids = building_ids
         self.cost_function = cost_function
         self.cost_rbc = None
@@ -341,6 +347,7 @@ class CityLearn(gym.Env):
                          'weather_file': self.data_path / self.weather_file,
                          'solar_profile': self.data_path / self.solar_profile,
                          'carbon_intensity': self.data_path / self.carbon_intensity,
+                         'electricity_price': self.data_path / self.electricity_price,
                          'building_ids': building_ids,
                          'buildings_states_actions': self.buildings_states_actions,
                          'save_memory': save_memory}
@@ -400,6 +407,7 @@ class CityLearn(gym.Env):
 
         self.buildings_net_electricity_demand = []
         self.current_carbon_intensity = list(self.buildings.values())[0].sim_results['carbon_intensity'][self.time_step]
+        self.current_electricity_price = list(self.buildings.values())[0].sim_results['electricity_price'][self.time_step]
         electric_demand = 0
         elec_consumption_electrical_storage = 0
         elec_consumption_dhw_storage = 0
@@ -612,12 +620,12 @@ class CityLearn(gym.Env):
             self.state = np.array(self.state, dtype='object')
 
             rewards = self.reward_function.get_rewards(self.buildings_net_electricity_demand,
-                                                       self.current_carbon_intensity)
+                                                       self.current_carbon_intensity, self.current_electricity_price)
             self.cumulated_reward_episode += sum(rewards)
 
-        # Control variables which are used to display the results and the behavior of the buildings at the district
-        # level.
+        # Control variables which are used to display the results and the behavior of the buildings at district level
         self.carbon_emissions.append(np.float32(max(0, electric_demand) * self.current_carbon_intensity))
+        self.electricity_costs.append(np.float32(max(0, electric_demand) * self.current_electricity_price))
         self.net_electric_consumption.append(np.float32(electric_demand))
         self.electric_consumption_electric_storage.append(np.float32(elec_consumption_electrical_storage))
         self.electric_consumption_dhw_storage.append(np.float32(elec_consumption_dhw_storage))
@@ -644,6 +652,7 @@ class CityLearn(gym.Env):
         self.next_hour()
 
         self.carbon_emissions = []
+        self.electricity_costs= []
         self.net_electric_consumption = []
         self.net_electric_consumption_no_storage = []
         self.net_electric_consumption_no_pv_no_storage = []
@@ -717,6 +726,7 @@ class CityLearn(gym.Env):
 
             # When the simulation is over, convert all the control variables to numpy arrays so they are easier to plot.
             self.carbon_emissions = np.array(self.carbon_emissions)
+            self.electricity_costs = np.array(self.electricity_costs)
             self.net_electric_consumption = np.array(self.net_electric_consumption)
             self.net_electric_consumption_no_storage = np.array(self.net_electric_consumption_no_storage)
             self.net_electric_consumption_no_pv_no_storage = np.array(self.net_electric_consumption_no_pv_no_storage)
@@ -746,7 +756,7 @@ class CityLearn(gym.Env):
         # Running the reference rule-based controller to find the baseline cost
         if self.cost_rbc is None:
             env_rbc = CityLearn(self.data_path, self.building_attributes, self.weather_file, self.solar_profile,
-                                self.building_ids, carbon_intensity=self.carbon_intensity,
+                                self.building_ids, carbon_intensity=self.carbon_intensity, electricity_price=self.electricity_price,
                                 buildings_states_actions=self.buildings_states_actions_filename,
                                 simulation_period=self.simulation_period, cost_function=self.cost_function,
                                 central_agent=False)
@@ -822,7 +832,7 @@ class CityLearn(gym.Env):
 
             if self.simulation_period[1] - self.simulation_period[0] > 8760:
                 cost_last_yr['peak_demand_last_yr'] = np.array(self.net_electric_consumption[-8760:]).max() / \
-                                                      self.cost_rbc_last_yr['peak_demand_last_yr']
+                                                    self.cost_rbc_last_yr['peak_demand_last_yr']
                 c_score_last_yr.append(cost_last_yr['peak_demand_last_yr'])
 
         # Positive net electricity consumption for the whole district. It is clipped at a min. value of 0 because the
@@ -830,8 +840,7 @@ class CityLearn(gym.Env):
         # Island operation is therefore incentivized)
         if 'net_electricity_consumption' in self.cost_function:
             cost['net_electricity_consumption'] = np.array(self.net_electric_consumption).clip(min=0).sum() / \
-                                                  self.cost_rbc[
-                                                      'net_electricity_consumption']
+                                                self.cost_rbc['net_electricity_consumption']
 
             if self.simulation_period[1] - self.simulation_period[0] > 8760:
                 cost_last_yr['net_electricity_consumption_last_yr'] = np.array(
@@ -843,8 +852,13 @@ class CityLearn(gym.Env):
 
             if self.simulation_period[1] - self.simulation_period[0] > 8760:
                 cost_last_yr['carbon_emissions_last_yr'] = np.array(self.carbon_emissions[-8760:]).sum() / \
-                                                           self.cost_rbc_last_yr[
-                                                               'carbon_emissions_last_yr']
+                                                            self.cost_rbc_last_yr['carbon_emissions_last_yr']
+        if 'electricity_costs' in self.cost_function:
+            cost['electricity_costs'] = np.array(self.electricity_costs).sum() / self.cost_rbc['electricity_costs']
+
+            if self.simulation_period[1] - self.simulation_period[0] > 8760:
+                cost_last_yr['electricity_costs_last_yr'] = np.array(self.electricity_costs[-8760:]).sum() / \
+                                                            self.cost_rbc_last_yr['electricity_costs_last_yr']
 
         # Not used for the challenge
         if 'quadratic' in self.cost_function:
@@ -923,6 +937,12 @@ class CityLearn(gym.Env):
 
             if self.simulation_period[1] - self.simulation_period[0] > 8760:
                 cost_last_yr['carbon_emissions_last_yr'] = self.carbon_emissions[-8760:].sum()
+
+        if 'electricity_costs' in self.cost_function:
+            cost['electricity_costs'] = self.electricity_costs.sum()
+
+            if self.simulation_period[1] - self.simulation_period[0] > 8760:
+                cost_last_yr['electricity_costs_last_yr'] = self.electricity_costs[-8760:].sum()
 
         if 'quadratic' in self.cost_function:
             cost['quadratic'] = (self.net_electric_consumption.clip(min=0) ** 2).sum()
